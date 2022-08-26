@@ -197,29 +197,27 @@ and APIs available for users. The exact parameters and features of
 filters between the platforms and APIs vary, and the table may also
 have errors and omissions.
 
-| Filter                                | Windows | Linux | MacOS | VA-API | Microsoft DXVA | Intel MediaSDK | Apple CIF |
-|:--------------------------------------|:--|:--|:--|:--|:--|:--|:--|
-| Brightness, Contrast, Hue, Saturation |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |
-| White balance                         |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |
-| Color space conversion                |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |
-| Denoise                               |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |
-| Scaling                               | ✓ | ✓ |   | ✓ | ✓ | ✓ |   |
-| Deinterlace                           | ✓ | ✓ |   |   | ✓ | ✓ |   |
-| Blur                                  |   |   | ✓ |   |   |   | ✓ |
-| Sharpen                               |   | ✓ | ✓ | ✓ |   | ✓ | ✓ |
-| Transpose/rotation                    |   | ✓ |   |   |   | ✓ |   |
-| Image blending                        | ✓ |   |   |   | ✓ |   |   |
-| Video composition                     |   | ✓ |   |   |   | ✓ |   |
-| Video stabilization                   |   |   |   |   |   | ✓ |   |
-| Skin color enhancement                |   |   |   |   |   | ✓ |   |
-| Gamma correction                      |   |   | ✓ |   |   | ✓ | ✓ |
+| Filter                                | Windows | Linux | MacOS |
+|:--------------------------------------|:--|:--|:--|
+| Brightness, Contrast, Hue, Saturation | ✓ | ✓ | ✓ |
+| White balance                         | ✓ | ✓ | ✓ |
+| Color space conversion                | ✓ | ✓ | ✓ |
+| Denoise                               |   | ✓ | ✓ |
+| Scaling                               | ✓ | ✓ | ✓ |
+| Deinterlace                           | ✓ | ✓ | ✓ |
+| Blur                                  |   |   | ✓ |
+| Sharpen                               |   | ✓ | ✓ |
+| Transpose/rotation                    |   | ✓ | ✓ |
+| Image blending                        | ✓ |   | ✓ |
+| Video composition                     | ✓ |   | ✓ |
+| Skin color enhancement                |   | ✓ |   |
+| Gamma correction                      |   | ✓ | ✓ |
 
 Where
 
-* VA-API: [VA-API](http://intel.github.io/libva/group__api__vpp.html) with [GStreamer](https://gstreamer.freedesktop.org/documentation/vaapi/vaapipostproc.html?gi-language=c#vaapipostproc) on Linux
-* Microsoft DXVA: Microsoft [Media Foundation/DXVA](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/dxva/) on Windows
-* Intel MediaSDK: Intel [MediaSDK](https://github.com/Intel-Media-SDK/MediaSDK/blob/master/doc/samples/readme-vpp_linux.md) on Linux
-* Apple CIF: Apple [Core Image Filter](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html#//apple_ref/doc/uid/TP40004346) on MacOS
+* Windows: Microsoft [Media Foundation/DXVA](https://docs.microsoft.com/en-us/windows/win32/medfound/dxva-video-processing)
+* Linux: [VA-API](http://intel.github.io/libva/group__api__vpp.html)
+* MacOS: Apple [Core Image Filter](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html#//apple_ref/doc/uid/TP40004346)
 
 # Examples
 
@@ -304,4 +302,6 @@ Many thanks for valuable feedback and advice from:
 * Eero Hakkinen
 * Ben Lin
 * Jianlin Qiu
+* Zoltan Kis
+
 
