@@ -58,23 +58,21 @@ we make available the system-level video filters.
   to the defined API in a backwards-compatible way.
 * The API must also allow users to query the set of available filters.
 
-## Non-goals
+## Opens
 
-* Web applications do not need to allow providing filters themselves
-  (although a polyfill-style approach may be feasible). These (eg. WASM-based)
-  filters might have lower performance. User should be able to trust the
-  efficient implementation of the provided filters.
 * Other data content except video frames/video. Although audio filters
   might be useful, their performance is usually sufficient also with
   an efficient WASM-based implementation. We also do not consider more
   exotic data content (eg. vector-based meshes) since that would complicate
   the API and has limited support on common systems.
-* A filter can be configured only once. If configuration needs to be changed,
-  the filter needs to be destructed and a new filter needs to be created. Static
-  configuration includes the number of input and output streams and frame resolution
-  on each stream.
+* **Filter chaining**: is it useful to have chainability directly in the API
+  (as opposed to let user to pass `VideoFrame`s and data between filters)?
 
-# The Video Filtering API
+# Simple Video Filtering API
+
+In this Section we propose a simple API with a single new `interface`. The API
+is based on the WebCodecs types. `VideoFrame`s are passed in, processed, and new
+`VideoFrame`s are obtained.
 
 The `VideoFilter` interface is a mix of the existing
 [`VideoDecoder`](https://w3c.github.io/webcodecs/#videodecoder-interface) and
@@ -190,36 +188,7 @@ callback VideoFilterOutputCallback = undefined(VideoFrame frame, unsigned short 
 
 ```
 
-# Platform Support
-
-This sections lists some filters available on different platforms
-and APIs available for users. The exact parameters and features of
-filters between the platforms and APIs vary, and the table may also
-have errors and omissions.
-
-| Filter                                | Windows | Linux | MacOS |
-|:--------------------------------------|:--|:--|:--|
-| Brightness, Contrast, Hue, Saturation | ✓ | ✓ | ✓ |
-| White balance                         | ✓ | ✓ | ✓ |
-| Color space conversion                | ✓ | ✓ | ✓ |
-| Denoise                               |   | ✓ | ✓ |
-| Scaling                               | ✓ | ✓ | ✓ |
-| Deinterlace                           | ✓ | ✓ | ✓ |
-| Blur                                  |   |   | ✓ |
-| Sharpen                               |   | ✓ | ✓ |
-| Transpose/rotation                    |   | ✓ | ✓ |
-| Image blending                        | ✓ |   | ✓ |
-| Video composition                     | ✓ |   | ✓ |
-| Skin color enhancement                |   | ✓ |   |
-| Gamma correction                      |   | ✓ | ✓ |
-
-Where
-
-* Windows: Microsoft [Media Foundation/DXVA](https://docs.microsoft.com/en-us/windows/win32/medfound/dxva-video-processing)
-* Linux: [VA-API](http://intel.github.io/libva/group__api__vpp.html)
-* MacOS: Apple [Core Image Filter](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html#//apple_ref/doc/uid/TP40004346)
-
-# Examples
+# Simple Video Filtering API Examples
 
 ## Example 1: Simple Denoising
 
@@ -273,6 +242,186 @@ function errorCallback(DOMException error) {
   // Error occurred    
 }
 ```
+
+# Chainable Filtering API
+
+Most operating system APIs such as Windows, MacOS, and Linux expose filter
+pipelines which process video frames in a chain of operations. The pipelines
+may have branches, for example, two video streams could be combined into one
+(picture-in-a-picture) or one video stream could be processed into main output
+and into secondary output with a thumbnail-sized video. Passing data from
+one filtering element to another may be more efficient when the data is
+kept in the pipeline from start to end instead of being passed back to user in
+a `VideoFrame`.
+
+Creating and manipulating pipelines with branches is complicated but would
+offer significant advantages. A lot of prior work has been made by the
+[GStreamer](https://gstreamer.freedesktop.org/) community, but Web applications
+can not leverage the GStreamer API. In this Section, our goal is to propose
+a new Web API specification which allows building graph-based filter chains
+in the GStreamer-style. In the implementation, user agent could leverage the
+GStreamer framework or could implement the API by other means.
+
+The specification should specify filter elements ('plugins' in GStreamer terminology) 
+which offer significant benefit when executed using the system-level API compared to
+implementation with ECMAScript, WASM, or WebGPU.  The specification must specify
+how a Web application would create filter elements and connections between them. It needs
+to also specify a method to query the set of available filters and their properties.
+We do not expect that an implementation would provide all specified filters but only those
+for which an efficient implementation is available on the platform.
+
+In this Section we propose an API which leverages the
+[Streams API](https://streams.spec.whatwg.org/) and 
+[Insertable streams](https://www.w3.org/TR/mediacapture-transform/).
+A pipeline will expose one or more `ReadadbleStream`s and `WritableStream`s
+which allow passing data in and out from the pipeline. Since these streams are
+data-type agnostic, also other type of data can be passed than just video data,
+although we see most benefits with video data.
+
+```
+interface FilterPipeline {
+	constructor(FilterPipelineConfig config);
+
+	Promise<undefined> configurePipeline(FilterPipelineConfig config);
+        Promise<FilterElement> createElement(FilterElementConfig config);
+	Promise<undefined> deleteElement(FilterElement element);
+	Promise<WritableStream> importPort(FilterElement element, DOMString port);
+	Promise<ReadableStream> exportPort(FilterElement element, DOMString port);
+	Promise<sequence<DOMString>> getAvailableFilterTypes();
+
+	readonly attribute FilterPipelineConfig config;
+	readonly attribute sequence<FilterElement> elements;
+	readonly attribute sequence<FilterPipelineImport> in;
+	readonly attribute sequence<FilterPipelineExport> out;
+	readonly attribute FilterPipelineState state;
+};
+
+dictionary FilterPipelineImport {
+	WritableStream writable;
+	FilterElement element;
+	DOMString port;
+};
+
+dictionary FilterPipelineExport {
+	ReadableStream readable;
+	FilterElement element;
+	DOMString port;
+};
+
+dictionary FilterPipelineConfig {
+	// TBD
+};
+
+enum FilterState {
+	"unconfigured",
+	"configured",
+	"closed"
+};
+
+interface FilterElement {
+	Promise<undefined> configureElement(FilterElementConfig config);
+
+	readonly attribute FilterElementConfig config;
+	readonly attribute sequence<FilterPort> in;
+	readonly attribute sequence<FilterPort> out;
+};
+
+partial dictionary FilterElementConfig {
+	required DOMString type;
+	// TBD
+};
+
+partial dictionary FilterElementConfig {
+	// when type == "denoise"
+	float strength;
+};
+
+partial dictionary FilterElementConfig {
+	// when type == "scale"
+	unsigned long outputWidth;
+	unsigned long outputHeight;
+};
+
+interface FilterPort {
+	Promise<undefined> configurePort(FilterPortConfig config);
+	Promise<undefined> connectPort(FilterElement element, DOMString port);
+	Promise<undefined> detachPort();
+
+	readonly attribute DOMString name;
+	readonly attribute FilterElement peer;
+	readonly attribute DOMString peerPort;
+	readonly attribute FilterPortConfig config;
+};
+
+partial dictionary FilterPortConfig {
+
+};
+```
+
+## Opens
+
+* Set of available FilterElement types and their properties
+* Data type/format specification and negotiation between elements
+* Passing of metadata
+* Synchronization
+* Signaling and error reporting
+* Buffering
+
+#  Chainable Filtering API Examples
+
+## Example 2: Scaling and Then Denoising
+
+```
+// Build a pipeline such that:   [writable] -> scaler -> denoiser -> [readable]
+const pipeline = new FilterPipeline({});
+const scaler = pipeline.createElement({ type: "scale", outputWidth: 640, outputHeight: 480 });
+const denoiser = pipeline.createElement({ type: "denoise", strength: 0.6 });
+await scaler.out[0].connectPort(denoiser, denoiser.in[0].name);
+const inport = await pipeline.importPort(scaler, scaler.in[0].name);
+const outport = await pipeline.exportPort(denoiser, denoiser.out[0].name);
+
+// Use insertable streams to get and push video data
+const stream = await getUserMedia({video:true});
+const videoTrack = stream.getVideoTracks()[0];
+const processor = new MediaStreamTrackProcessor({track: videoTrack});
+const generator = new MediaStreamTrackGenerator({kind: 'video'});
+
+processor.readable.pipeThrough({ writable: inport, readable: outport }).pipeTo(generator.writable);
+const videoBefore = document.getElementById('video-before');
+const videoAfter = document.getElementById('video-after');
+videoBefore.srcObject = stream;
+const streamAfter = new MediaStream([generator]);
+videoAfter.srcObject = streamAfter;
+```
+
+# Platform Support
+
+This sections lists some filters available on different platforms
+and APIs available for users. The exact parameters and features of
+filters between the platforms and APIs vary, and the table may also
+have errors and omissions.
+
+| Filter                                | Windows | Linux | MacOS |
+|:--------------------------------------|:--|:--|:--|
+| Brightness, Contrast, Hue, Saturation | ✓ | ✓ | ✓ |
+| White balance                         | ✓ | ✓ | ✓ |
+| Color space conversion                | ✓ | ✓ | ✓ |
+| Denoise                               |   | ✓ | ✓ |
+| Scaling                               | ✓ | ✓ | ✓ |
+| Deinterlace                           | ✓ | ✓ | ✓ |
+| Blur                                  |   |   | ✓ |
+| Sharpen                               |   | ✓ | ✓ |
+| Transpose/rotation                    |   | ✓ | ✓ |
+| Image blending                        | ✓ |   | ✓ |
+| Video composition                     | ✓ |   | ✓ |
+| Skin color enhancement                |   | ✓ |   |
+| Gamma correction                      |   | ✓ | ✓ |
+
+Where
+
+* Windows: Microsoft [Media Foundation/DXVA](https://docs.microsoft.com/en-us/windows/win32/medfound/dxva-video-processing)
+* Linux: [VA-API](http://intel.github.io/libva/group__api__vpp.html)
+* MacOS: Apple [Core Image Filter](https://developer.apple.com/library/archive/documentation/GraphicsImaging/Reference/CoreImageFilterReference/index.html#//apple_ref/doc/uid/TP40004346)
 
 # Rationale
 
